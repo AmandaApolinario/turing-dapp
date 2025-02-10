@@ -118,7 +118,7 @@ contract Turing is ERC20, Ownable {
 
     // Função para votar
     function vote(string memory codinome, uint256 quantidade) public votingIsOn onlyAuthorized(codinome) {
-        require(quantidade <= 2 * 10**18, "Quantidade de saTurings nao pode ser maior que 2");
+        require(quantidade <= 2 * 10**18, "Quantidade de Turings nao pode ser maior que 2");
         require(!hasVoted[msg.sender][codinome], "Voce ja votou neste codinome");
         require(codinomes[codinome] != msg.sender, "Voce nao pode votar em si mesmo");
 

@@ -4,184 +4,130 @@ import detectEthereumProvider from '@metamask/detect-provider';
 import TuringArtifact from './artifacts/contracts/Turing.sol/Turing.json';
 import './App.css';
 
-const TURING_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3"; // Substitua pelo endereço do contrato
+const CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
 
 function App() {
   const [provider, setProvider] = useState(null);
   const [contract, setContract] = useState(null);
   const [account, setAccount] = useState(null);
   const [codinomes, setCodinomes] = useState([]);
-  const [selectedCodinome, setSelectedCodinome] = useState('');
-  const [amount, setAmount] = useState(0);
+  const [selectedIssue, setSelectedIssue] = useState('');
+  const [selectedVote, setSelectedVote] = useState('');
+  const [amountIssue, setAmountIssue] = useState('');
+  const [amountVote, setAmountVote] = useState('');
   const [ranking, setRanking] = useState([]);
-  const [votingEnabled, setVotingEnabled] = useState(true);
+  const [isVotingActive, setIsVotingActive] = useState(true);
 
-  // Inicializa o provider, contrato e conta
   useEffect(() => {
-    async function init() {
+    async function initialize() {
       const provider = await detectEthereumProvider();
-      if (provider) {
-        await provider.request({ method: 'eth_requestAccounts' });
-        const web3Provider = new ethers.providers.Web3Provider(provider);
-        setProvider(web3Provider);
-
-        const signer = web3Provider.getSigner();
-        const contract = new ethers.Contract(TURING_ADDRESS, TuringArtifact.abi, signer);
-        setContract(contract);
-
-        const account = await signer.getAddress();
-        setAccount(account);
-
-        // Carrega a lista de codinomes
-        try {
-          const codinomesList = await contract.getCodinomes();
-          setCodinomes(codinomesList);
-        } catch (error) {
-          console.error("Erro ao carregar codinomes:", error);
-        }
-
-        // Carrega o ranking inicial
-        updateRanking(contract);
-      }
+      if (!provider) return alert('MetaMask não encontrado');
+      
+      await provider.request({ method: 'eth_requestAccounts' });
+      const web3Provider = new ethers.providers.Web3Provider(provider);
+      setProvider(web3Provider);
+      
+      const signer = web3Provider.getSigner();
+      const contractInstance = new ethers.Contract(CONTRACT_ADDRESS, TuringArtifact.abi, signer);
+      setContract(contractInstance);
+      
+      const userAccount = await signer.getAddress();
+      setAccount(userAccount);
+      
+      loadCodinomes(contractInstance);
+      updateRanking(contractInstance);
     }
-    init();
+    initialize();
   }, []);
 
+  const loadCodinomes = async (contract) => {
+    try {
+      const names = await contract.getCodinomes();
+      setCodinomes(names);
+    } catch (error) {
+      console.error('Erro ao carregar codinomes:', error);
+    }
+  };
 
-  // Atualiza o ranking de usuários
   const updateRanking = async (contract) => {
     try {
-      const codinomesList = await contract.getCodinomes();
-      const ranking = await Promise.all(codinomesList.map(async (codinome) => {
-        const address = await contract.codinomes(codinome);
+      const names = await contract.getCodinomes();
+      const rankingData = await Promise.all(names.map(async (name) => {
+        const address = await contract.codinomes(name);
         const balance = await contract.balanceOf(address);
-        return { codinome, balance: ethers.utils.formatEther(balance) };
+        return { name, balance: ethers.utils.formatEther(balance) };
       }));
-      ranking.sort((a, b) => b.balance - a.balance);
-      setRanking(ranking);
+      setRanking(rankingData.sort((a, b) => b.balance - a.balance));
     } catch (error) {
-      console.error("Erro ao atualizar ranking:", error);
+      console.error('Erro ao atualizar ranking:', error);
     }
   };
 
-  // Emite tokens para um codinome
-  const handleIssueToken = async () => {
+  const handleTransaction = async (method, selected, amount) => {
+    if (!selected || !amount) return alert('Preencha todos os campos');
     try {
-      const amountInSaTurings = ethers.utils.parseEther(amount.toString());
-      const tx = await contract.issueToken(selectedCodinome, amountInSaTurings);
+      const parsedAmount = ethers.utils.parseEther(amount);
+      const tx = await contract[method](selected, parsedAmount);
       await tx.wait();
-      alert('Tokens emitidos com sucesso!');
-      updateRanking(contract);
+      alert('Operação realizada com sucesso!');
+      if (method === 'vote') {
+        updateRanking(contract);
+      }
     } catch (error) {
-      console.error("Erro ao emitir tokens:", error);
-      alert('Erro ao emitir tokens. Verifique o console para mais detalhes.');
-    }
-  };
-
-  // Vota em um codinome
-  const handleVote = async () => {
-    try {
-      const amountInSaTurings = ethers.utils.parseEther(amount.toString());
-      const tx = await contract.vote(selectedCodinome, amountInSaTurings);
-      await tx.wait();
-      alert('Voto registrado com sucesso!');
-      updateRanking(contract);
-    } catch (error) {
-      console.error("Erro ao votar:", error);
-      alert('Erro ao votar. Verifique o console para mais detalhes.');
-    }
-  };
-
-  // Ativa a votação
-  const handleVotingOn = async () => {
-    try {
-      const tx = await contract.votingOn();
-      await tx.wait();
-      setVotingEnabled(true);
-      alert('Votação ativada!');
-    } catch (error) {
-      console.error("Erro ao ativar votação:", error);
-      alert('Erro ao ativar votação. Verifique o console para mais detalhes.');
-    }
-  };
-
-  // Desativa a votação
-  const handleVotingOff = async () => {
-    try {
-      const tx = await contract.votingOff();
-      await tx.wait();
-      setVotingEnabled(false);
-      alert('Votação desativada!');
-    } catch (error) {
-      console.error("Erro ao desativar votação:", error);
-      alert('Erro ao desativar votação. Verifique o console para mais detalhes.');
+      console.error(`Erro ao executar ${method}:`, error);
+      alert('Erro na operação. Verifique o console.');
     }
   };
 
   return (
-    <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h1>DApp Turing</h1>
-      <div style={{ marginBottom: '20px' }}>
-        <h2>Emitir Tokens</h2>
-        <select
-          onChange={(e) => setSelectedCodinome(e.target.value)}
-          style={{ padding: '5px', marginRight: '10px' }}
-        >
-          <option value="">Selecione um codinome</option>
-          {codinomes.map((codinome, index) => (
-            <option key={index} value={codinome}>{codinome}</option>
-          ))}
-        </select>
-        <input
-          type="number"
-          placeholder="Quantidade de Turings"
-          onChange={(e) => setAmount(e.target.value)}
-          style={{ padding: '5px', marginRight: '10px' }}
-        />
-        <button onClick={handleIssueToken} style={{ padding: '5px 10px' }}>Emitir Tokens</button>
+    <div className="container">
+      <h1>Turing DApp</h1>
+      <div className="flex-container" style={{ display: 'flex', justifyContent: 'flex-start', gap: '40px' }}>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <h2>Emitir Tokens</h2>
+          <Selection codinomes={codinomes} setSelected={setSelectedIssue} />
+          <InputField value={amountIssue} setValue={setAmountIssue} />
+          <button onClick={() => handleTransaction('issueToken', selectedIssue, amountIssue)}>Emitir</button>
+        </section>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <h2>Votar</h2>
+          <Selection codinomes={codinomes} setSelected={setSelectedVote} />
+          <InputField value={amountVote} setValue={setAmountVote} />
+          <button onClick={() => handleTransaction('vote', selectedVote, amountVote)} disabled={!isVotingActive}>Votar</button>
+        </section>
       </div>
-      <div style={{ marginBottom: '20px' }}>
-        <h2>Votar</h2>
-        <select
-          onChange={(e) => setSelectedCodinome(e.target.value)}
-          style={{ padding: '5px', marginRight: '10px' }}
-        >
-          <option value="">Selecione um codinome</option>
-          {codinomes.map((codinome, index) => (
-            <option key={index} value={codinome}>{codinome}</option>
-          ))}
-        </select>
-        <input
-          type="number"
-          placeholder="Quantidade de Turings"
-          onChange={(e) => setAmount(e.target.value)}
-          style={{ padding: '5px', marginRight: '10px' }}
-        />
-        <button
-          onClick={handleVote}
-          disabled={!votingEnabled}
-          style={{ padding: '5px 10px' }}
-        >
-          Votar
-        </button>
-      </div>
-      <div style={{ marginBottom: '20px' }}>
+      <section>
         <h2>Controle de Votação</h2>
-        <button onClick={handleVotingOn} style={{ padding: '5px 10px', marginRight: '10px' }}>Ativar Votação</button>
-        <button onClick={handleVotingOff} style={{ padding: '5px 10px' }}>Desativar Votação</button>
-      </div>
-      <div>
-        <h2>Ranking</h2>
-        <ul>
-          {ranking.map((item, index) => (
-            <li key={index}>
-              {item.codinome}: {item.balance} TUR
-            </li>
-          ))}
-        </ul>
-      </div>
+        <button onClick={() => handleTransaction('votingOn')}>Ativar</button>
+        <button onClick={() => handleTransaction('votingOff')}>Desativar</button>
+      </section>
+      <Ranking ranking={ranking} />
     </div>
   );
 }
+
+const Selection = ({ codinomes, setSelected }) => (
+  <select onChange={(e) => setSelected(e.target.value)}>
+    <option value="">Selecione</option>
+    {codinomes.map((name, i) => (
+      <option key={i} value={name}>{name}</option>
+    ))}
+  </select>
+);
+
+const InputField = ({ value, setValue }) => (
+  <input type="number" placeholder="Quantidade" value={value} onChange={(e) => setValue(e.target.value)} />
+);
+
+const Ranking = ({ ranking }) => (
+  <section>
+    <h2>Ranking</h2>
+    <ul>
+      {ranking.map((entry, i) => (
+        <li key={i}>{entry.name}: {entry.balance} TUR</li>
+      ))}
+    </ul>
+  </section>
+);
 
 export default App;
