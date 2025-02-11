@@ -21,6 +21,22 @@ function App() {
     initialize();
   }, []);
 
+  useEffect(() => {
+    let intervalId;
+
+    if (contract) {
+      intervalId = setInterval(() => {
+        updateRanking(contract);
+      }, 10000);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [contract]);
+
   const initialize = async () => {
     try {
       const provider = await detectEthereumProvider();
@@ -68,8 +84,6 @@ function App() {
       console.error('Erro ao atualizar ranking:', error);
       alert('Erro ao atualizar ranking. Verifique o console.');
     }
-    setSelected({issue: '', vote: ''});
-    setAmount({issue: '', vote: ''});
   };
 
   const handleIssueTokens = async () => {
@@ -86,6 +100,8 @@ function App() {
       alert('Erro ao emitir tokens. Verifique o console.');
     } finally {
       setLoading(false);
+      setSelected({issue: '', vote: ''});
+      setAmount({issue: '', vote: ''});
     }
   };
 
@@ -100,11 +116,30 @@ function App() {
       await updateRanking(contract);
     } catch (error) {
       console.error('Erro ao votar:', error);
-      alert('Erro ao votar. Verifique o console.');
+      if (error.message.includes("Codinome invalido")) {
+        alert("Codinome inválido. Por favor, selecione um codinome válido.");
+      } else {
+        alert('Erro ao votar. Verifique o console.');
+      }
     } finally {
       setLoading(false);
+      setSelected({issue: '', vote: ''});
+      setAmount({issue: '', vote: ''});
     }
   };
+
+  const handleInvalidVote = async () => {
+    setSelected({ issue: '', vote: 'batata' });
+    setAmount({ issue: '', vote: '1' });
+  
+    setLoading(true);
+  };
+
+  useEffect(() => {
+    if (selected.vote === 'batata' && amount.vote === '1') {
+      handleVote();
+    }
+  }, [selected, amount]);
 
   const toggleVoting = async (method) => {
     setLoading(true);
@@ -141,6 +176,9 @@ function App() {
               <InputField value={amount.vote} setValue={(value) => setAmount({ ...amount, vote: value })} />
               <button onClick={handleVote} disabled={!isVotingActive || loading}>
                 {loading ? 'Processando...' : 'Votar'}
+              </button>
+              <button onClick={handleInvalidVote} disabled={!isVotingActive || loading}>
+                {loading ? 'Processando...' : 'Testar Voto Inválido'}
               </button>
               <p>Status da Votação: {isVotingActive ? 'Ativa' : 'Inativa'}</p>
             </section>

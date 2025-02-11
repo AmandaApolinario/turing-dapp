@@ -36,9 +36,14 @@ contract Turing is ERC20, Ownable {
         _;
     }
 
+    // Modifier para evitar que o owner ou a professora votem
+    modifier notOwnerOrProfessora() {
+        require(msg.sender != owner() && msg.sender != professora, "Owner e professora nao podem votar");
+        _;
+    }
+
     // Construtor do contrato
     constructor() ERC20("Turing", "TUR") {
-
         codinomes["nome1"] = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
         codinomes["nome2"] = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
         codinomes["nome3"] = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
@@ -79,11 +84,9 @@ contract Turing is ERC20, Ownable {
         codinomesInverso[0xdD2FD4581271e230360230F9337D5c0430Bf44C0] = "nome18";
         codinomesInverso[0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199] = "nome19";
 
-
         // Inicializa a votação como ativa
         votingEnabled = true;
     }
-
 
     // Função para obter a lista de codinomes
     function getCodinomes() public pure returns (string[] memory) {
@@ -109,7 +112,7 @@ contract Turing is ERC20, Ownable {
         codinomesList[18] = "nome19";
         return codinomesList;
     }
-   
+    
     // Função para emitir tokens (minting)
     function issueToken(string memory codinome, uint256 quantidade) public onlyOwnerOrProfessora onlyAuthorized(codinome) {
         address receptor = codinomes[codinome];
@@ -117,7 +120,8 @@ contract Turing is ERC20, Ownable {
     }
 
     // Função para votar
-    function vote(string memory codinome, uint256 quantidade) public votingIsOn onlyAuthorized(codinome) {
+    function vote(string memory codinome, uint256 quantidade) public votingIsOn onlyAuthorized(codinome) notOwnerOrProfessora {
+        require(codinomes[codinome] != address(0), "Codinome invalido");
         require(quantidade <= 2 * 10**18, "Quantidade de Turings nao pode ser maior que 2");
         require(!hasVoted[msg.sender][codinome], "Voce ja votou neste codinome");
         require(codinomes[codinome] != msg.sender, "Voce nao pode votar em si mesmo");
