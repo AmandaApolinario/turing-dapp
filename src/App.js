@@ -11,34 +11,39 @@ function App() {
   const [contract, setContract] = useState(null);
   const [account, setAccount] = useState(null);
   const [codinomes, setCodinomes] = useState([]);
-  const [selectedIssue, setSelectedIssue] = useState('');
-  const [selectedVote, setSelectedVote] = useState('');
-  const [amountIssue, setAmountIssue] = useState('');
-  const [amountVote, setAmountVote] = useState('');
+  const [selected, setSelected] = useState({ issue: '', vote: '' });
+  const [amount, setAmount] = useState({ issue: '', vote: '' });
   const [ranking, setRanking] = useState([]);
   const [isVotingActive, setIsVotingActive] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    async function initialize() {
+    initialize();
+  }, []);
+
+  const initialize = async () => {
+    try {
       const provider = await detectEthereumProvider();
       if (!provider) return alert('MetaMask não encontrado');
-      
+
       await provider.request({ method: 'eth_requestAccounts' });
       const web3Provider = new ethers.providers.Web3Provider(provider);
       setProvider(web3Provider);
-      
+
       const signer = web3Provider.getSigner();
       const contractInstance = new ethers.Contract(CONTRACT_ADDRESS, TuringArtifact.abi, signer);
       setContract(contractInstance);
-      
+
       const userAccount = await signer.getAddress();
       setAccount(userAccount);
-      
-      loadCodinomes(contractInstance);
-      updateRanking(contractInstance);
+
+      await loadCodinomes(contractInstance);
+      await updateRanking(contractInstance);
+    } catch (error) {
+      console.error('Erro ao inicializar:', error);
+      alert('Erro ao conectar à MetaMask. Verifique o console.');
     }
-    initialize();
-  }, []);
+  };
 
   const loadCodinomes = async (contract) => {
     try {
@@ -46,6 +51,7 @@ function App() {
       setCodinomes(names);
     } catch (error) {
       console.error('Erro ao carregar codinomes:', error);
+      alert('Erro ao carregar codinomes. Verifique o console.');
     }
   };
 
@@ -60,54 +66,105 @@ function App() {
       setRanking(rankingData.sort((a, b) => b.balance - a.balance));
     } catch (error) {
       console.error('Erro ao atualizar ranking:', error);
+      alert('Erro ao atualizar ranking. Verifique o console.');
+    }
+    setSelected({issue: '', vote: ''});
+    setAmount({issue: '', vote: ''});
+  };
+
+  const handleIssueTokens = async () => {
+    if (!selected.issue || !amount.issue) return alert('Preencha todos os campos');
+    setLoading(true);
+    try {
+      const parsedAmount = ethers.utils.parseEther(amount.issue);
+      const tx = await contract.issueToken(selected.issue, parsedAmount);
+      await tx.wait();
+      alert('Tokens emitidos com sucesso!');
+      await updateRanking(contract);
+    } catch (error) {
+      console.error('Erro ao emitir tokens:', error);
+      alert('Erro ao emitir tokens. Verifique o console.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleTransaction = async (method, selected, amount) => {
-    if (!selected || !amount) return alert('Preencha todos os campos');
+  const handleVote = async () => {
+    if (!selected.vote || !amount.vote) return alert('Preencha todos os campos');
+    setLoading(true);
     try {
-      const parsedAmount = ethers.utils.parseEther(amount);
-      const tx = await contract[method](selected, parsedAmount);
+      const parsedAmount = ethers.utils.parseEther(amount.vote);
+      const tx = await contract.vote(selected.vote, parsedAmount);
       await tx.wait();
-      alert('Operação realizada com sucesso!');
-      if (method === 'vote') {
-        updateRanking(contract);
-      }
+      alert('Voto realizado com sucesso!');
+      await updateRanking(contract);
     } catch (error) {
-      console.error(`Erro ao executar ${method}:`, error);
-      alert('Erro na operação. Verifique o console.');
+      console.error('Erro ao votar:', error);
+      alert('Erro ao votar. Verifique o console.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleVoting = async (method) => {
+    setLoading(true);
+    try {
+      const tx = await contract[method]();
+      await tx.wait();
+      setIsVotingActive(method === 'votingOn');
+      alert(`Votação ${method === 'votingOn' ? 'ativada' : 'desativada'} com sucesso!`);
+    } catch (error) {
+      console.error(`Erro ao ${method === 'votingOn' ? 'ativar' : 'desativar'} votação:`, error);
+      alert('Erro ao alterar o estado da votação. Verifique o console.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="container">
       <h1>Turing DApp</h1>
-      <div className="flex-container" style={{ display: 'flex', justifyContent: 'flex-start', gap: '40px' }}>
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h2>Emitir Tokens</h2>
-          <Selection codinomes={codinomes} setSelected={setSelectedIssue} />
-          <InputField value={amountIssue} setValue={setAmountIssue} />
-          <button onClick={() => handleTransaction('issueToken', selectedIssue, amountIssue)}>Emitir</button>
-        </section>
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <h2>Votar</h2>
-          <Selection codinomes={codinomes} setSelected={setSelectedVote} />
-          <InputField value={amountVote} setValue={setAmountVote} />
-          <button onClick={() => handleTransaction('vote', selectedVote, amountVote)} disabled={!isVotingActive}>Votar</button>
-        </section>
+      <div className="main-content">
+        <div className="actions">
+          <div className="flex-container">
+            <section>
+              <h2>Emitir Tokens</h2>
+              <Selection codinomes={codinomes} selected={selected.issue} setSelected={(value) => setSelected({ ...selected, issue: value })} />
+              <InputField value={amount.issue} setValue={(value) => setAmount({ ...amount, issue: value })} />
+              <button onClick={handleIssueTokens} disabled={loading}>
+                {loading ? 'Processando...' : 'Emitir'}
+              </button>
+            </section>
+            <section>
+              <h2>Votar</h2>
+              <Selection codinomes={codinomes} selected={selected.vote} setSelected={(value) => setSelected({ ...selected, vote: value })} />
+              <InputField value={amount.vote} setValue={(value) => setAmount({ ...amount, vote: value })} />
+              <button onClick={handleVote} disabled={!isVotingActive || loading}>
+                {loading ? 'Processando...' : 'Votar'}
+              </button>
+              <p>Status da Votação: {isVotingActive ? 'Ativa' : 'Inativa'}</p>
+            </section>
+          </div>
+          <section>
+            <h2>Controle de Votação</h2>
+            <button onClick={() => toggleVoting('votingOn')} disabled={loading || isVotingActive}>
+              {loading ? 'Processando...' : 'Ativar'}
+            </button>
+            <button onClick={() => toggleVoting('votingOff')} disabled={loading || !isVotingActive}>
+              {loading ? 'Processando...' : 'Desativar'}
+            </button>
+          </section>
+        </div>
+        <div className="ranking-section">
+          <Ranking ranking={ranking} />
+        </div>
       </div>
-      <section>
-        <h2>Controle de Votação</h2>
-        <button onClick={() => handleTransaction('votingOn')}>Ativar</button>
-        <button onClick={() => handleTransaction('votingOff')}>Desativar</button>
-      </section>
-      <Ranking ranking={ranking} />
     </div>
   );
 }
 
-const Selection = ({ codinomes, setSelected }) => (
-  <select onChange={(e) => setSelected(e.target.value)}>
+const Selection = ({ codinomes, selected, setSelected }) => (
+  <select value={selected} onChange={(e) => setSelected(e.target.value)}>
     <option value="">Selecione</option>
     {codinomes.map((name, i) => (
       <option key={i} value={name}>{name}</option>

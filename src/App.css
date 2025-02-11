@@ -1,6 +1,6 @@
 body {
   font-family: 'Arial', sans-serif;
-  background: linear-gradient(135deg, #ffdde1, #ee9ca7); /* Vibrant pastel gradient */
+  background: linear-gradient(135deg, #ffdde1, #ee9ca7);
   margin: 0;
   padding: 0;
   display: flex;
@@ -9,14 +9,40 @@ body {
   min-height: 100vh;
 }
 
-.App {
+.container {
   text-align: center;
   width: 90%;
-  max-width: 600px;
+  max-width: 1200px;
   background: #fff;
   padding: 30px;
   border-radius: 12px;
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.main-content {
+  display: flex;
+  gap: 40px;
+  width: 100%;
+}
+
+.actions {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.flex-container {
+  display: flex;
+  gap: 40px;
+}
+
+.ranking-section {
+  flex: 1;
+  background: #fff5f7;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
 }
 
 h1 {
@@ -27,16 +53,9 @@ h1 {
 }
 
 h2 {
-  color: #218380;
+  color: #8a4f7d;
   font-size: 22px;
   margin-bottom: 15px;
-}
-
-.button-container {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-bottom: 20px;
 }
 
 button {
@@ -60,18 +79,10 @@ button:disabled {
   cursor: not-allowed;
 }
 
-.token-info, .issue-token {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
-  margin-bottom: 20px;
-}
-
 select, input {
   padding: 12px;
   font-size: 16px;
-  border: 2px solid #ff758c;
+  border: 2px solid #ff7eb3;
   border-radius: 8px;
   margin: 5px 0;
   width: 100%;
@@ -86,11 +97,15 @@ ul {
 }
 
 li {
-  background: linear-gradient(135deg, #ffdde1, #ff758c);
+  background: linear-gradient(135deg, #ffdde1, #ff758c); 
   padding: 12px;
   margin: 5px 0;
   border-radius: 8px;
   color: white;
   font-weight: bold;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+p {
+  color: #8a4f7d; 
 }
